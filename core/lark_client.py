@@ -11,15 +11,12 @@ Based on analysis of jira_sync_v3 implementation, this client provides:
 """
 
 import json
-import os
-import socket
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 import random
 
 import requests
@@ -101,13 +98,10 @@ class EnhancedAuthManager:
             return self._token
     
     def _needs_refresh(self) -> bool:
-        """Check if token needs refresh"""
-        if not self._token or not self._token_expire_time:
-            return True
-        
-        # Check if token expires within buffer time
-        buffer_time = datetime.now() + timedelta(seconds=self.refresh_buffer)
-        return buffer_time >= self._token_expire_time
+        """Check if token needs refresh (following jira_sync_v3 pattern)"""
+        return (not self._token or 
+                not self._token_expire_time or 
+                datetime.now() >= self._token_expire_time)
     
     def _refresh_token_with_retry(self) -> bool:
         """Refresh token with retry logic"""
@@ -152,7 +146,7 @@ class EnhancedAuthManager:
                 if result.get('code') == 0:
                     return LarkResponse(
                         success=True,
-                        data=result.get('data', {})
+                        data=result  # Pass full result, not nested data
                     )
                 else:
                     return LarkResponse(
@@ -178,16 +172,17 @@ class EnhancedAuthManager:
         """Update token and expiration time"""
         self._token = token_data.get('tenant_access_token')
         
-        # Calculate expiration time with buffer
+        # Calculate expiration time with 5-minute buffer (following jira_sync_v3 pattern)
         expires_in = token_data.get('expire', 7200)  # Default 2 hours
-        self._token_expire_time = datetime.now() + timedelta(seconds=expires_in)
+        self._token_expire_time = datetime.now() + timedelta(seconds=expires_in - 300)
         
         self.logger.debug(f"Token 更新成功，過期時間: {self._token_expire_time}")
     
     def is_token_valid(self) -> bool:
-        """Check if current token is valid"""
-        with self._token_lock:
-            return not self._needs_refresh()
+        """Check if current token is valid (following jira_sync_v3 pattern)"""
+        return (self._token is not None and 
+                self._token_expire_time is not None and 
+                datetime.now() < self._token_expire_time)
 
 
 class RateLimitManager:
@@ -438,6 +433,9 @@ class LarkClient:
         self.base_url = config.get('base_url', 'https://open.larksuite.com/open-apis')
         self.max_page_size = config.get('max_page_size', 500)
         
+        # Token cache for wiki_token -> obj_token mapping
+        self._token_cache = {}
+        
         # Performance metrics
         self.metrics = {
             'requests_total': 0,
@@ -519,14 +517,53 @@ class LarkClient:
             'uptime': time.time() - self.start_time
         }
     
-    def get_table_records(self, app_token: str, table_id: str, 
+    def resolve_app_token(self, wiki_token: str) -> Optional[str]:
+        """Convert wiki_token to obj_token (app_token) following jira_sync_v3 pattern"""
+        # Check cache first
+        if wiki_token in self._token_cache:
+            self.logger.debug(f"使用快取的 obj_token: {wiki_token}")
+            return self._token_cache[wiki_token]
+        
+        # Make request to get obj_token
+        endpoint = f"/wiki/v2/spaces/get_node?token={wiki_token}"
+        response = self._make_authenticated_request('GET', endpoint)
+        
+        if response.success:
+            node_data = response.data.get('node', {})
+            obj_token = node_data.get('obj_token')
+            
+            if obj_token:
+                # Cache the result
+                self._token_cache[wiki_token] = obj_token
+                self.logger.info(f"成功解析 wiki_token 到 obj_token: {wiki_token} -> {obj_token}")
+                return obj_token
+            else:
+                self.logger.error(f"API 回應中找不到 obj_token: {response.data}")
+        else:
+            self.logger.error(f"無法解析 wiki_token: {response.error_message}")
+        
+        return None
+
+    def get_table_records(self, wiki_token: str, table_id: str, 
                          page_size: Optional[int] = None) -> List[Dict]:
-        """Get all records from a table with pagination"""
+        """Get all records from a table with pagination (using wiki_token)"""
+        # Step 1: Resolve wiki_token to obj_token
+        obj_token = self.resolve_app_token(wiki_token)
+        if not obj_token:
+            self.logger.error("無法解析 wiki_token 到 obj_token")
+            return []
+        
+        # Step 2: Use obj_token to fetch table records
+        return self._get_table_records_by_obj_token(obj_token, table_id, page_size)
+    
+    def _get_table_records_by_obj_token(self, obj_token: str, table_id: str, 
+                                       page_size: Optional[int] = None) -> List[Dict]:
+        """Get all records from a table using obj_token"""
         page_size = page_size or self.max_page_size
         all_records = []
         page_token = None
         
-        self.logger.info(f"開始獲取表格記錄: {app_token}/{table_id}")
+        self.logger.info(f"開始獲取表格記錄: {obj_token}/{table_id}")
         
         while True:
             # Prepare parameters
@@ -535,7 +572,7 @@ class LarkClient:
                 params['page_token'] = page_token
             
             # Make request
-            endpoint = f"/bitable/v1/apps/{app_token}/tables/{table_id}/records"
+            endpoint = f"/bitable/v1/apps/{obj_token}/tables/{table_id}/records"
             response = self._make_authenticated_request('GET', endpoint, params=params)
             
             if not response.success:
@@ -556,9 +593,16 @@ class LarkClient:
         self.logger.info(f"表格記錄獲取完成，共 {len(all_records)} 筆記錄")
         return all_records
     
-    def get_table_schema(self, app_token: str, table_id: str) -> Optional[Dict]:
-        """Get table schema information"""
-        endpoint = f"/bitable/v1/apps/{app_token}/tables/{table_id}/fields"
+    def get_table_schema(self, wiki_token: str, table_id: str) -> Optional[Dict]:
+        """Get table schema information (using wiki_token)"""
+        # Step 1: Resolve wiki_token to obj_token
+        obj_token = self.resolve_app_token(wiki_token)
+        if not obj_token:
+            self.logger.error("無法解析 wiki_token 到 obj_token")
+            return None
+        
+        # Step 2: Use obj_token to fetch table schema
+        endpoint = f"/bitable/v1/apps/{obj_token}/tables/{table_id}/fields"
         response = self._make_authenticated_request('GET', endpoint)
         
         if response.success:
@@ -567,19 +611,3 @@ class LarkClient:
             self.logger.error(f"獲取表格 Schema 失敗: {response.error_message}")
             return None
     
-    def health_check(self) -> bool:
-        """Perform health check on the client"""
-        try:
-            # Check if we can get a valid token
-            token = self.auth_manager.get_valid_token()
-            if not token:
-                return False
-            
-            # Check if we can make a simple request
-            # This is a lightweight endpoint to test connectivity
-            response = self._make_authenticated_request('GET', '/bitable/v1/apps')
-            return response.success
-            
-        except Exception as e:
-            self.logger.error(f"健康檢查失敗: {e}")
-            return False
