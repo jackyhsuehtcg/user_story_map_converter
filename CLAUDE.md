@@ -594,3 +594,179 @@ lark_client:
   parallel_pagination: true
   pagination_workers: 5
 ```
+
+## 8. Markmap 心智圖生成技術規範
+
+### **Markmap 基本概念**
+
+Markmap 是結合 Markdown 和心智圖的工具，將 Markdown 內容解析並提取其內在層次結構，渲染成互動式心智圖。
+
+**核心組件**:
+- **markmap-lib**: 預處理 Markdown 為結構化資料
+- **markmap-view**: 將資料渲染為互動式 SVG
+- **markmap-cli**: 命令列工具，生成 HTML/PNG/SVG 等格式
+
+### **CLI 工具使用**
+
+**安裝**:
+```bash
+npm install -g markmap-cli
+# 或使用 npx (免安裝)
+npx markmap input.md
+```
+
+**基本語法**:
+```bash
+markmap [options] <input.md>
+
+# 常用選項
+--no-open           # 不自動開啟輸出檔案
+--no-toolbar        # 不顯示工具列
+-o, --output <file> # 指定輸出檔案名稱
+--offline           # 內嵌所有資源，離線可用
+-w, --watch         # 監控檔案變化（開發模式）
+```
+
+**輸出格式**:
+```bash
+# 生成 HTML（預設）
+markmap story.md -o story.html
+
+# 離線版本（內嵌所有資源）
+markmap story.md --offline -o story_offline.html
+
+# 注意：當前版本的 markmap-cli (0.18.12) 只支援 HTML 輸出
+# PNG/SVG 生成需要額外工具或方法
+```
+
+### **Markdown 語法規範**
+
+**層次結構**:
+```markdown
+# 根節點 (Level 1)
+## 分支節點 (Level 2)
+### 葉節點 (Level 3)
+#### 子葉節點 (Level 4)
+##### 深層節點 (Level 5)
+###### 最深節點 (Level 6)
+```
+
+**進階語法支援**:
+```markdown
+### 文字樣式
+- **粗體** ~~刪除線~~ *斜體* ==高亮==
+- `行內程式碼`
+- [x] 核取方塊
+- [連結文字](https://example.com)
+
+### 數學公式 (KaTeX)
+- 公式: $x = {-b \pm \sqrt{b^2-4ac} \over 2a}$
+
+### 程式碼區塊
+```javascript
+console.log('hello, JavaScript')
+```
+
+### 表格
+| 產品 | 價格 |
+|------|------|
+| 蘋果 | 4 元 |
+| 香蕉 | 2 元 |
+
+### 圖片
+![圖片描述](https://example.com/image.png)
+
+### 有序列表
+1. 項目 1
+2. 項目 2
+   - 子項目 2.1
+   - 子項目 2.2
+```
+
+### **配置選項 (Frontmatter)**
+
+在 Markdown 檔案開頭使用 YAML frontmatter 配置心智圖選項：
+
+```yaml
+---
+title: User Story Map
+markmap:
+  colorFreezeLevel: 2     # 顏色凍結層級
+  maxWidth: 300           # 節點最大寬度
+  spacingHorizontal: 80   # 水平間距
+  spacingVertical: 5      # 垂直間距
+  autoFit: true          # 自動適應大小
+  pan: true              # 允許拖拽
+  zoom: true             # 允許縮放
+  color: 
+    - '#FF6B6B'          # 自定義顏色方案
+    - '#4ECDC4'
+    - '#45B7D1'
+    - '#96CEB4'
+---
+
+# 心智圖內容從這裡開始
+## 主要功能
+### 登入系統
+### 使用者管理
+```
+
+**重要配置說明**:
+- `colorFreezeLevel`: 控制顏色層級，設為 2 表示第二層之後使用相同顏色
+- `maxWidth`: 節點文字最大寬度，避免過長文字
+- `fold`: 可在節點後加 `<!-- markmap: fold -->` 使其可摺疊
+
+### **User Story Map 最佳實踐**
+
+**推薦的 Markdown 結構**:
+```markdown
+---
+title: User Story Map - 登入系統
+markmap:
+  colorFreezeLevel: 2
+  maxWidth: 250
+  spacingHorizontal: 100
+---
+
+# 使用者故事地圖
+
+## Epic: 使用者驗證
+### Story: 登入功能
+- **AC1**: 輸入帳號密碼
+- **AC2**: 驗證身份
+- **AC3**: 成功登入後導向首頁
+
+### Story: 登出功能
+- **AC1**: 點擊登出按鈕
+- **AC2**: 清除 Session
+- **AC3**: 導向登入頁面
+
+## Epic: 使用者管理
+### Story: 個人資料
+- **AC1**: 查看個人資訊
+- **AC2**: 編輯個人資料
+- **AC3**: 儲存變更
+
+### Story: 密碼管理
+- **AC1**: 修改密碼
+- **AC2**: 忘記密碼重設
+```
+
+**資料轉換策略**:
+- **Story.No** → 二級標題 (`## Story-ARD-00001`)
+- **Features** → 標題文字內容
+- **Criteria** → 子項目列表 (`- AC1: 具體條件`)
+- **Parent-Child** → Markdown 層次結構 (`#`, `##`, `###`)
+- **Extra Fields** → 額外的項目列表或註解
+
+### **效能與限制**
+
+**建議限制**:
+- 節點數量: < 200 個（保持響應性）
+- 層級深度: < 8 層（視覺清晰）
+- 文字長度: 每個節點 < 100 字元（使用 maxWidth 控制）
+
+**效能優化**:
+- 使用 `colorFreezeLevel` 減少顏色計算
+- 設定適當的 `maxWidth` 避免文字溢出
+- 對於大型心智圖，考慮分拆為多個檔案

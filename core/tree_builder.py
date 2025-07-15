@@ -18,6 +18,7 @@ Usage:
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ class TreeNode:
     story_no: str
     features: str
     criteria: Optional[str] = None
+    tcg: Optional[str] = None
     parent_id: Optional[str] = None
     children: List['TreeNode'] = field(default_factory=list)
     level: int = 0
@@ -49,6 +51,7 @@ class TreeNode:
             'story_no': self.story_no,
             'features': self.features,
             'criteria': self.criteria,
+            'tcg': self.tcg,
             'parent_id': self.parent_id,
             'level': self.level,
             'children': [child.to_dict() for child in self.children]
@@ -74,6 +77,16 @@ class TreeBuilder:
             'criteria': 'Criteria'
         })
         self.preserve_extra_fields = self.config.get('preserve_extra_fields', True)
+        
+        # Story number validation pattern: Story-XXX-YYYYY
+        self.story_pattern = re.compile(r'^Story-[A-Z]+(-[A-Z0-9]+)+$', re.IGNORECASE)
+        
+        # Statistics for filtered records
+        self.filtered_stats = {
+            'empty_story_no': 0,
+            'invalid_format': 0,
+            'valid_records': 0
+        }
     
     def build_tree(self, lark_records: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -88,7 +101,14 @@ class TreeBuilder:
         if not lark_records:
             return {'trees': [], 'metadata': self._get_metadata()}
         
-        # Parse records into nodes
+        # Reset statistics
+        self.filtered_stats = {
+            'empty_story_no': 0,
+            'invalid_format': 0,
+            'valid_records': 0
+        }
+        
+        # Parse records into nodes with validation
         nodes = {}
         for record in lark_records:
             node = self._parse_record(record)
@@ -109,23 +129,49 @@ class TreeBuilder:
         for root in root_nodes:
             self._set_levels(root, 0)
         
+        # Log filtering statistics
+        total_records = len(lark_records)
+        self.logger.info(f"Record filtering completed: {self.filtered_stats['valid_records']}/{total_records} records passed validation")
+        if self.filtered_stats['empty_story_no'] > 0:
+            self.logger.info(f"Filtered {self.filtered_stats['empty_story_no']} records with empty Story numbers")
+        if self.filtered_stats['invalid_format'] > 0:
+            self.logger.info(f"Filtered {self.filtered_stats['invalid_format']} records with invalid Story number format")
+        
         return {
             'trees': [root.to_dict() for root in root_nodes],
             'metadata': self._get_metadata()
         }
     
     def _parse_record(self, record: Dict[str, Any]) -> Optional[TreeNode]:
-        """Parse single record into TreeNode"""
+        """Parse single record into TreeNode with Story number validation"""
         record_id = record.get('record_id')
         if not record_id:
             return None
         
         fields = record.get('fields', {})
         
-        # Use configurable field mappings
-        story_no = fields.get(self.field_mappings['story_no'], f'Unknown-{record_id[:8]}')
+        # Get story number from fields
+        story_no = fields.get(self.field_mappings['story_no'], '').strip()
+        
+        # Validate story number
+        if not story_no:
+            self.filtered_stats['empty_story_no'] += 1
+            self.logger.warning(f"Record {record_id}: Story number is empty, filtering out")
+            return None
+        
+        if not self._is_valid_story_format(story_no):
+            self.filtered_stats['invalid_format'] += 1
+            self.logger.warning(f"Record {record_id}: Story number '{story_no}' does not match Story-XXX-YYYYY format, filtering out")
+            return None
+        
+        # Record is valid
+        self.filtered_stats['valid_records'] += 1
+        self.logger.debug(f"Record {record_id}: Valid story number '{story_no}'")
+        
+        # Get other fields
         features = fields.get(self.field_mappings['features'], 'No description')
         criteria = fields.get(self.field_mappings['criteria'], '')
+        tcg = self._extract_tcg_value(fields)
         
         parent_id = self._extract_parent_id(fields)
         
@@ -142,6 +188,7 @@ class TreeBuilder:
             story_no=story_no,
             features=features,
             criteria=criteria if criteria else None,
+            tcg=tcg,
             parent_id=parent_id,
             extra_fields=extra_fields
         )
@@ -164,6 +211,44 @@ class TreeBuilder:
         
         return None
     
+    def _extract_tcg_value(self, fields: Dict[str, Any]) -> Optional[str]:
+        """Extract TCG value from fields"""
+        tcg_field_name = self.field_mappings.get('tcg', 'TCG')
+        tcg_data = fields.get(tcg_field_name)
+        
+        if not tcg_data:
+            return None
+        
+        # TCG 欄位的格式類似於 Parent Tickets
+        if isinstance(tcg_data, list) and len(tcg_data) > 0:
+            tcg_item = tcg_data[0]
+            if isinstance(tcg_item, dict):
+                text_arr = tcg_item.get('text_arr', [])
+                if text_arr and len(text_arr) > 0:
+                    tcg_value = text_arr[0].strip()
+                    if tcg_value:
+                        self.logger.debug(f"Found TCG value: {tcg_value}")
+                        return tcg_value
+        
+        return None
+    
+    def _is_valid_story_format(self, story_no: str) -> bool:
+        """
+        Validate if story number matches Story-XXX-YYYYY format
+        
+        Args:
+            story_no: Story number to validate
+            
+        Returns:
+            True if format is valid, False otherwise
+        """
+        if not story_no or not isinstance(story_no, str):
+            return False
+        
+        # Check against pattern: Story-XXX-YYYYY (e.g., Story-ARD-00001)
+        match = self.story_pattern.match(story_no.strip())
+        return match is not None
+    
     def _set_levels(self, node: TreeNode, level: int):
         """Set node levels recursively"""
         node.level = level
@@ -174,5 +259,7 @@ class TreeBuilder:
         """Get metadata for the tree"""
         return {
             'build_timestamp': datetime.now().isoformat(),
-            'builder_version': '1.0'
+            'builder_version': '1.0',
+            'filtering_stats': self.filtered_stats.copy(),
+            'validation_pattern': self.story_pattern.pattern
         }
