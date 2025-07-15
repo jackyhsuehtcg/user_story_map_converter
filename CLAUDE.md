@@ -50,6 +50,9 @@ user_story_map_converter/
 │   ├── task.log        # 背景任務專用日誌
 │   ├── error.log       # 錯誤日誌集中存放
 │   └── archive/        # 歷史日誌歸檔
+├── temp/               # 臨時檔案與測試資料
+│   ├── test_*.py       # 測試腳本
+│   └── lark_data_*.json # 從 Lark 提取的原始資料
 └── exports/            # 匯出檔案存放
 ```
 
@@ -89,7 +92,23 @@ user_story_map_converter/
 Lark API → lark_client → tree_builder → Markdown 生成 → markmap-cli → HTML/PNG 匯出
 ```
 
-### **6. 核心功能實作策略**
+### **6. 資料管理原則**
+
+**檔案組織規範**:
+*   **temp/ 目錄**: 所有臨時檔案、測試資料、開發過程中產生的 JSON 檔案都存放在 `temp/` 目錄
+    *   測試腳本: `temp/test_*.py`
+    *   Lark 原始資料: `temp/lark_data_*.json`
+    *   開發過程中的暫存檔案
+*   **logs/ 目錄**: 系統日誌檔案專用
+*   **exports/ 目錄**: 最終產品匯出檔案 (PNG, PDF, HTML 等)
+*   **static/ 目錄**: Web 靜態資源 (CSS, JS, 圖片)
+
+**資料流管理**:
+*   **原始資料提取**: `tools/lark_data_extractor.py` → `temp/lark_data_*.json`
+*   **中間處理結果**: 樹狀結構建構、Markdown 生成 → `temp/`
+*   **最終產品**: 心智圖匯出 → `exports/`
+
+### **7. 核心功能實作策略**
 
 *   **心智圖生成**:
     *   Python 的核心任務是將 Lark 資料轉換為 **Markdown 格式的文字**。視覺化工作完全交由外部 `markmap-cli` 工具處理。

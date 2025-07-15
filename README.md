@@ -9,7 +9,7 @@
 - **心智圖生成**: 將結構化資料轉換為視覺化心智圖
 - **多團隊管理**: Web 介面管理多個團隊的 Lark 資料來源
 - **多格式匯出**: 支援 HTML、PNG、JPG、Markdown、PDF 等格式
-- **響應式設計**: 參考 macOS 風格的 Glass 設計，支援日夜模式
+- **響應式設計**: 簡潔實用的介面設計，支援日夜模式
 
 ### 技術架構
 
@@ -31,6 +31,8 @@ user_story_map_converter/
 │   ├── main.py         # 主頁路由
 │   ├── teams.py        # 團隊管理
 │   └── export.py       # 匯出功能
+├── tools/               # 開發工具
+│   └── lark_data_extractor.py  # Lark 資料提取工具
 ├── static/              # 靜態檔案
 ├── templates/           # HTML 模板
 ├── logs/               # 日誌檔案
@@ -96,6 +98,34 @@ python app.py
 python temp/test_lark_client.py
 ```
 
+### 開發工具
+
+#### Lark 資料提取工具
+
+使用 `lark_data_extractor.py` 工具從 Lark 表格 URL 直接提取原始資料：
+
+```bash
+# 基本用法
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox"
+
+# 指定輸出檔案
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox" --output my_data.json
+
+# 靜默模式
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox" --quiet
+```
+
+工具會提取以下資料並儲存到 `temp/` 目錄：
+- 表格基本資訊 (table_info)
+- 欄位結構定義 (table_schema)
+- 完整記錄資料 (table_records)
+- 提取摘要統計 (summary)
+
+**檔案管理原則**：
+- 所有 Lark 原始資料檔案預設儲存到 `temp/` 目錄
+- 檔案命名格式：`temp/lark_data_{table_name}_{timestamp}.json`
+- 可透過 `--output` 參數指定自訂路徑
+
 ## 📋 功能特性
 
 ### Web 介面
@@ -111,7 +141,7 @@ python temp/test_lark_client.py
 - **PDF**: 列印友好格式
 
 ### 設計特色
-- macOS 風格的 Glass 設計
+- 簡潔實用的介面設計
 - 日夜模式切換
 - 統一的對話框和通知樣式
 - 響應式佈局
@@ -174,6 +204,73 @@ api:
 ---
 
 ## 🛠️ 實作細節
+
+### 開發工具詳細說明
+
+#### Lark 資料提取工具 (lark_data_extractor.py)
+
+這個工具專門用於從 Lark 表格 URL 提取原始資料，支援以下功能：
+
+**核心功能：**
+- **URL 解析**: 自動解析 Lark 表格 URL，提取 wiki_token 和 table_id
+- **兩階段認證**: 使用 wiki_token → obj_token 轉換機制
+- **完整資料提取**: 獲取表格資訊、欄位定義、所有記錄
+- **JSON 輸出**: 結構化資料輸出，便於後續處理
+
+**輸出資料結構：**
+```json
+{
+  "extraction_info": {
+    "timestamp": "2025-07-14T18:42:59.751222",
+    "source_url": "https://tcgaming.larksuite.com/base/...",
+    "wiki_token": "MKdDwAgbwiVbzDkSkTHl3D8Hg0e",
+    "table_id": "tblsGKHK8l7wxaox",
+    "extractor_version": "1.0"
+  },
+  "table_info": {
+    "table_id": "tblsGKHK8l7wxaox",
+    "name": "Table_tblsGKHK8l7wxaox",
+    "obj_token": "GEE0brIkta7JrAsVXe4lpy4dgxe",
+    "wiki_token": "MKdDwAgbwiVbzDkSkTHl3D8Hg0e"
+  },
+  "table_schema": [
+    {
+      "field_id": "fldinqUt1P",
+      "field_name": "Story.No",
+      "type": 1,
+      "ui_type": "Text"
+    }
+  ],
+  "table_records": [
+    {
+      "record_id": "recuQk4CrkECtg",
+      "fields": {
+        "Story.No": "Story-ARD-00001",
+        "Features": "登入畫面"
+      }
+    }
+  ],
+  "summary": {
+    "total_fields": 4,
+    "total_records": 9,
+    "table_name": "Table_tblsGKHK8l7wxaox"
+  }
+}
+```
+
+**使用範例：**
+```bash
+# 提取資料並查看摘要
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox"
+
+# 輸出到指定檔案
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox" -o temp/user_story_data.json
+
+# 靜默模式，只顯示結果 (預設儲存到 temp/ 目錄)
+python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAgbwiVbzDkSkTHl3D8Hg0e?table=tblsGKHK8l7wxaox" --quiet
+```
+
+---
 
 ### Lark API 客戶端 (lark_client.py)
 
@@ -328,23 +425,10 @@ def export_mindmap(team_id, format):
 
 ### 前端設計
 
-#### Glass 風格實作
-```css
-/* macOS 風格 Glass 效果 */
-.glass-container {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-/* 日夜模式切換 */
-[data-theme="dark"] .glass-container {
-    background: rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-```
+#### UI 框架選擇
+- 使用 Bootstrap 或類似成熟的前端框架
+- 專注於功能性和易用性
+- 避免過度複雜的視覺效果
 
 #### 響應式佈局
 - 使用 Bootstrap Grid 系統
