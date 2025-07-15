@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+
+{% block title %}{{ team.name }} - 心智圖查看{% endblock %}
+
+{% block content %}
+<!-- 頁面標題 -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">{{ team.name or 'Team Alpha' }} - User Story Map</h1>
+        <p class="text-muted mb-0">
+            <i class="fas fa-clock me-1"></i>
+            最後更新: {{ team.last_updated or '2025-07-15 14:30:25' }}
+        </p>
+    </div>
+    <div class="btn-group" role="group">
+        <button class="btn btn-outline-secondary" onclick="refreshMindmap()">
+            <i class="fas fa-sync-alt me-1"></i>刷新
+        </button>
+        <button class="btn btn-outline-secondary" onclick="toggleFullscreen()">
+            <i class="fas fa-expand me-1"></i>全螢幕
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fas fa-download me-1"></i>匯出
+        </button>
+    </div>
+</div>
+
+<!-- 心智圖展示區 -->
+<div class="row">
+    <div class="col-lg-9">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sitemap me-2"></i>互動式心智圖
+                    </h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-secondary" onclick="zoomIn()" title="放大">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="zoomOut()" title="縮小">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="resetZoom()" title="重設縮放">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- 心智圖 iframe -->
+                <iframe src="{{ mindmap_url or '/static/sample-mindmap.html' }}" 
+                        class="w-100 border-0" 
+                        style="height: 600px;"
+                        id="mindmapFrame">
+                </iframe>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3">
+        <!-- 統計面板 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>統計資訊
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-primary mb-0">{{ stats.total_nodes or 42 }}</div>
+                        <small class="text-muted">總節點數</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-success mb-0">{{ stats.criteria_nodes or 8 }}</div>
+                        <small class="text-muted">Criteria 節點</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-info mb-0">{{ stats.jira_links or 15 }}</div>
+                        <small class="text-muted">JIRA 連結</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="h4 text-warning mb-0">{{ stats.max_depth or 5 }}</div>
+                        <small class="text-muted">最大深度</small>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">生成時間</span>
+                    <span class="fw-medium">{{ stats.generation_time or '0.87' }}s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能說明 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>互動功能
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-hand-paper fa-fw me-2 text-muted"></i>
+                        <small>拖拽移動視圖</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-search-plus fa-fw me-2 text-muted"></i>
+                        <small>滾輪縮放</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-mouse-pointer fa-fw me-2 text-muted"></i>
+                        <small>點擊節點摺疊</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-comment fa-fw me-2 text-muted"></i>
+                        <small>懸停顯示 Criteria</small>
+                    </li>
+                    <li class="mb-0">
+                        <i class="fas fa-external-link-alt fa-fw me-2 text-muted"></i>
+                        <small>JIRA 超連結</small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 快速操作 -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>快速操作
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="exportHTML()">
+                        <i class="fas fa-code me-1"></i>匯出 HTML
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="exportPNG()" disabled>
+                        <i class="fas fa-image me-1"></i>匯出 PNG
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="exportPDF()" disabled>
+                        <i class="fas fa-file-pdf me-1"></i>匯出 PDF
+                    </button>
+                    <hr>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="copyShareLink()">
+                        <i class="fas fa-link me-1"></i>複製分享連結
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 匯出模態框 -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-download me-2"></i>匯出心智圖
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">選擇格式</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="exportHTML" checked>
+                        <label class="form-check-label" for="exportHTML">
+                            <i class="fas fa-code me-2"></i>HTML (互動式)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="exportPNG" disabled>
+                        <label class="form-check-label text-muted" for="exportPNG">
+                            <i class="fas fa-image me-2"></i>PNG (靜態圖片) - 功能開發中
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="exportPDF" disabled>
+                        <label class="form-check-label text-muted" for="exportPDF">
+                            <i class="fas fa-file-pdf me-2"></i>PDF (可列印) - 功能開發中
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="exportFileName" class="form-label">檔案名稱</label>
+                    <input type="text" class="form-control" id="exportFileName" 
+                           value="team_alpha_mindmap_{{ '2025-07-15' }}">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">品質設定</label>
+                    <select class="form-select" id="exportQuality">
+                        <option value="standard">標準 (快速)</option>
+                        <option value="high" selected>高品質 (推薦)</option>
+                        <option value="ultra">超高品質 (較慢)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="startExport()">
+                    <i class="fas fa-download me-1"></i>開始匯出
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let isFullscreen = false;
+
+// 全螢幕切換
+function toggleFullscreen() {
+    const iframe = document.getElementById('mindmapFrame');
+    
+    if (!isFullscreen) {
+        if (iframe.requestFullscreen) {
+            iframe.requestFullscreen();
+        } else if (iframe.webkitRequestFullscreen) {
+            iframe.webkitRequestFullscreen();
+        } else if (iframe.msRequestFullscreen) {
+            iframe.msRequestFullscreen();
+        }
+        isFullscreen = true;
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        isFullscreen = false;
+    }
+}
+
+// 縮放控制
+function zoomIn() {
+    const iframe = document.getElementById('mindmapFrame');
+    // TODO: 與心智圖框架通信進行縮放
+    console.log('縮放放大');
+}
+
+function zoomOut() {
+    const iframe = document.getElementById('mindmapFrame');
+    // TODO: 與心智圖框架通信進行縮放
+    console.log('縮放縮小');
+}
+
+function resetZoom() {
+    const iframe = document.getElementById('mindmapFrame');
+    // TODO: 與心智圖框架通信重置縮放
+    console.log('重置縮放');
+}
+
+// 刷新心智圖
+function refreshMindmap() {
+    const teamId = '{{ team.id }}';
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // 顯示刷新中狀態
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>刷新中...';
+    button.disabled = true;
+    
+    // 重新生成心智圖
+    fetch(`/api/teams/${teamId}/refresh`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('刷新失敗: ' + data.error);
+        } else {
+            alert('開始重新生成心智圖，請稍後刷新頁面');
+            // 延遲刷新頁面
+            setTimeout(() => location.reload(), 2000);
+        }
+    })
+    .catch(error => {
+        console.error('刷新失敗:', error);
+        alert('刷新失敗，請稍後再試');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// 匯出功能
+function exportHTML() {
+    const teamId = '{{ team.id }}';
+    const mindmapUrl = '{{ mindmap_url }}';
+    
+    if (mindmapUrl.includes('sample-mindmap')) {
+        alert('請先生成心智圖後再匯出');
+        return;
+    }
+    
+    // 直接下載目前的心智圖檔案
+    const link = document.createElement('a');
+    link.href = mindmapUrl;
+    link.download = `${teamId}_mindmap.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('匯出 HTML');
+}
+
+function exportPNG() {
+    showAlert('功能開發中', 'PNG 匯出功能正在開發中，敬請期待！', 'info');
+}
+
+function exportPDF() {
+    showAlert('功能開發中', 'PDF 匯出功能正在開發中，敬請期待！', 'info');
+}
+
+// 開始匯出
+function startExport() {
+    const formats = [];
+    if (document.getElementById('exportHTML').checked) formats.push('html');
+    // PNG 和 PDF 暫時不支援
+    
+    const fileName = document.getElementById('exportFileName').value;
+    const quality = document.getElementById('exportQuality').value;
+    
+    if (formats.length === 0) {
+        showAlert('請選擇格式', '請選擇至少一種匯出格式', 'warning');
+        return;
+    }
+    
+    // 目前只支援 HTML 匯出
+    if (formats.includes('html')) {
+        exportHTML();
+    }
+    
+    // 關閉模態框
+    const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+    modal.hide();
+}
+
+// 複製分享連結
+function copyShareLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        console.log('分享連結已複製');
+        // 顯示成功提示
+        showAlert('複製成功', '分享連結已複製到剪貼簿', 'success');
+    }).catch(err => {
+        console.error('複製失敗:', err);
+        showAlert('複製失敗', '無法複製分享連結，請手動複製網址', 'error');
+    });
+}
+
+// 顯示提示訊息
+function showAlert(title, message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        <strong>${title}</strong> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 自動移除提示
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 3000);
+}
+
+// 監聽全螢幕變化
+document.addEventListener('fullscreenchange', function() {
+    isFullscreen = !!document.fullscreenElement;
+});
+</script>
+{% endblock %}

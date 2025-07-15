@@ -107,3 +107,9 @@ yarn-error.log*
 
 # Temporary files and test scripts
 temp/
+
+# Team configurations (runtime data)
+teams.json
+
+# Project documentation with implementation details
+CLAUDE.md

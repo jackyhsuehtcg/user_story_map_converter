@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}儀表板{% endblock %}
+
+{% block content %}
+<!-- 頁面標題 -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">儀表板</h1>
+    <a href="/teams" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>新增團隊
+    </a>
+</div>
+
+<!-- 統計資訊面板 -->
+<div class="row mb-4">
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="h4 mb-0">{{ total_stats.total_teams }}</div>
+                        <div class="small">總團隊數</div>
+                    </div>
+                    <div class="h1 opacity-50">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="h4 mb-0">{{ total_stats.total_records }}</div>
+                        <div class="small">總記錄數</div>
+                    </div>
+                    <div class="h1 opacity-50">
+                        <i class="fas fa-database"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 col-md-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="h4 mb-0">{{ total_stats.total_mindmap_files }}</div>
+                        <div class="small">心智圖檔案</div>
+                    </div>
+                    <div class="h1 opacity-50">
+                        <i class="fas fa-sitemap"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- 團隊卡片 -->
+{% if teams %}
+<div class="row">
+    {% for team in teams %}
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 {{ 'border-warning' if team.status == 'generating' else '' }}">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title mb-0 fw-bold">{{ team.name }}</h5>
+                    {% if team.status == 'active' %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>正常連接
+                        </span>
+                    {% elif team.status == 'generating' %}
+                        <span class="badge bg-warning">
+                            <i class="fas fa-hourglass-half me-1"></i>生成中
+                        </span>
+                    {% elif team.status == 'error' %}
+                        <span class="badge bg-danger">
+                            <i class="fas fa-exclamation-circle me-1"></i>連接失敗
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-pause-circle me-1"></i>待處理
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <!-- 團隊資訊 -->
+                <div class="mb-3 flex-grow-1">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <div class="h6 mb-0 text-primary">{{ team.record_count }}</div>
+                                <small class="text-muted">記錄數</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                {% if team.mindmap_file %}
+                                    <div class="h6 mb-0 text-success">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                    <small class="text-muted">已生成</small>
+                                {% else %}
+                                    <div class="h6 mb-0 text-muted">
+                                        <i class="fas fa-minus-circle"></i>
+                                    </div>
+                                    <small class="text-muted">未生成</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                
+                <!-- 最後更新時間 -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        {% if team.last_updated %}
+                            {{ team.last_updated }}
+                        {% else %}
+                            尚未同步
+                        {% endif %}
+                    </small>
+                    
+                    <!-- 操作按鈕 -->
+                    <div class="btn-group" role="group">
+                        {% if team.status == 'generating' %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </button>
+                        {% else %}
+                            {% if team.mindmap_file %}
+                                <a href="{{ url_for('mindmap', team_id=team.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye me-1"></i>查看
+                                </a>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="syncTeamFromDashboard('{{ team.id }}')">
+                                    <i class="fas fa-sync-alt me-1"></i>同步
+                                </button>
+                            {% endif %}
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{{ url_for('teams') }}">
+                                    <i class="fas fa-cog fa-fw me-2"></i>管理
+                                </a></li>
+                                {% if team.mindmap_file %}
+                                <li><a class="dropdown-item" href="{{ url_for('mindmap', team_id=team.id) }}">
+                                    <i class="fas fa-eye fa-fw me-2"></i>查看心智圖
+                                </a></li>
+                                {% endif %}
+                                {% if team.lark_url %}
+                                <li><a class="dropdown-item" href="{{ team.lark_url }}" target="_blank">
+                                    <i class="fas fa-external-link-alt fa-fw me-2"></i>開啟 Lark 資料表
+                                </a></li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" onclick="syncTeamFromDashboard('{{ team.id }}')">
+                                    <i class="fas fa-sync-alt fa-fw me-2"></i>重新同步
+                                </a></li>
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- 空狀態 -->
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="fas fa-inbox fa-5x text-muted"></i>
+    </div>
+    <h4 class="text-muted">尚未建立任何團隊</h4>
+    <p class="text-muted mb-4">
+        開始建立您的第一個團隊，生成 User Story Map 心智圖
+    </p>
+    <a href="/teams" class="btn btn-primary btn-lg">
+        <i class="fas fa-plus me-2"></i>建立第一個團隊
+    </a>
+</div>
+{% endif %}
+
+<!-- 快速統計卡片 -->
+{% if teams %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>團隊狀態分佈
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center">
+                        <div class="h4 text-success">{{ teams_by_status.active|length }}</div>
+                        <div class="text-muted">已生成心智圖</div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="h4 text-warning">{{ teams_by_status.generating|length }}</div>
+                        <div class="text-muted">生成中</div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="h4 text-secondary">{{ teams_by_status.idle|length }}</div>
+                        <div class="text-muted">待處理</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 從儀表板同步團隊
+function syncTeamFromDashboard(teamId) {
+    console.log('從儀表板同步團隊:', teamId);
+    
+    // 發送同步請求
+    fetch(`/api/teams/${teamId}/refresh`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showNotification('同步失敗', data.error, 'error');
+        } else {
+            showNotification('開始同步', '開始同步，請稍後刷新頁面查看狀態', 'success');
+            // 刷新頁面以顯示最新狀態
+            setTimeout(() => location.reload(), 1000);
+        }
+    })
+    .catch(error => {
+        console.error('同步失敗:', error);
+        showNotification('同步失敗', '同步失敗，請稍後再試', 'error');
+    });
+}
+
+// 顯示提示訊息（使用通知形式）
+function showAlert(title, message, type = 'info') {
+    showNotification(title, message, type);
+}
+
+// 顯示生成中的通知
+{% if total_stats.generating_teams > 0 %}
+document.addEventListener('DOMContentLoaded', function() {
+    showNotification('正在處理中', '有 {{ total_stats.generating_teams }} 個團隊正在生成心智圖，頁面將自動刷新', 'info');
+});
+
+// 自動刷新生成中的團隊狀態
+setTimeout(() => {
+    location.reload();
+}, 5000); // 5秒後自動刷新
+{% endif %}
+
+// 顯示通知
+function showNotification(title, message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0`;
+    notification.setAttribute('role', 'alert');
+    notification.setAttribute('aria-live', 'assertive');
+    notification.setAttribute('aria-atomic', 'true');
+    notification.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>${title}</strong><br>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // 創建 toast 容器（如果不存在）
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.appendChild(notification);
+    
+    // 顯示 toast
+    const toast = new bootstrap.Toast(notification, {
+        autohide: false // 不自動隱藏，讓用戶可以手動關閉
+    });
+    toast.show();
+    
+    // 如果是生成中的通知，在自動刷新前移除
+    if (type === 'info' && title === '正在處理中') {
+        setTimeout(() => {
+            toast.hide();
+        }, 4000);
+    }
+}
+</script>
+{% endblock %}

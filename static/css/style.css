@@ -1,0 +1,129 @@
+/* 1. 全域樣式與新調色盤 (Gmail/SaaS 風格) */
+:root {
+    --primary-color: #4A69BD; /* 岩石藍 */
+    --primary-color-light: #EAF0FE; /* 主色調的淺色，用於懸停和選中 */
+    --body-bg: #F6F8FC;
+    --container-bg: #FFFFFF;
+    --dark-text: #2d3748;
+    --muted-text: #718096;
+    --border-color: #e2e8f0;
+
+    --success-bg-subtle: #d1e7dd;
+    --success-text-emphasis: #0f5132;
+    --warning-bg-subtle: #fff3cd;
+    --warning-text-emphasis: #664d03;
+    --danger-bg-subtle: #f8d7da;
+    --danger-text-emphasis: #58151c;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--body-bg);
+    color: var(--dark-text);
+}
+
+/* 2. 左側導覽邊欄 */
+.sidebar {
+    width: 260px;
+    background-color: var(--container-bg);
+    border-right: 1px solid var(--border-color);
+}
+
+.brand-title {
+    color: var(--dark-text);
+}
+
+.sidebar .nav-link {
+    color: var(--muted-text);
+    font-weight: 500;
+    border-radius: 6px;
+    margin-bottom: 0.25rem;
+}
+
+.sidebar .nav-link:hover {
+    background-color: var(--primary-color-light);
+    color: var(--primary-color);
+}
+
+.sidebar .nav-link.active {
+    background-color: var(--primary-color-light);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.sidebar .nav-link .fa-fw {
+    width: 1.25em;
+}
+
+/* 3. 右側主內容區 */
+.main-content {
+    overflow-y: auto; /* 內容超長時，只有右側滾動 */
+}
+
+/* 4. 按鈕樣式 */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border: 1px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #FFFFFF;
+}
+
+.btn-primary:hover {
+    background-color: #3e58a1; /* 加深一點 */
+    border-color: #3e58a1;
+}
+
+.btn-outline-secondary {
+    border-color: var(--border-color);
+    color: var(--muted-text);
+    background-color: var(--container-bg);
+}
+
+.btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    color: var(--dark-text);
+}
+
+/* 5. 狀態按鈕 (Subtle 風格) */
+.btn-warning { background-color: var(--warning-bg-subtle); border-color: var(--warning-bg-subtle); color: var(--warning-text-emphasis); }
+.btn-warning:hover { background-color: #f8e9b7; }
+
+/* 6. 卡片和表格 */
+.card {
+    background-color: var(--container-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+.table th {
+    color: var(--muted-text);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-hover > tbody > tr:hover > * {
+    background-color: #f8f9fa;
+}
+
+/* 7. 徽章 */
+.badge { font-weight: 500; border-radius: 12px; padding: 0.4em 0.8em; }
+.badge.bg-success { background-color: var(--success-bg-subtle) !important; color: var(--success-text-emphasis) !important; }
+.badge.bg-danger { background-color: var(--danger-bg-subtle) !important; color: var(--danger-text-emphasis) !important; }
+
+/* 8. 下拉選單 z-index 修正 */
+.dropdown-menu {
+    z-index: 1050;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.table-responsive {
+    overflow: visible;
+}

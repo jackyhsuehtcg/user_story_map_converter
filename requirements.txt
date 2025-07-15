@@ -1,6 +1,5 @@
 # Web Framework
 Flask==2.3.2
-Flask-SQLAlchemy==3.0.5
 
 # HTTP Requests
 requests==2.31.0
@@ -9,20 +8,11 @@ urllib3==2.0.4
 # Configuration Management
 PyYAML==6.0.1
 
-# Database
-SQLAlchemy==2.0.19
-
-# Development and Testing
+# Development and Testing (optional)
 pytest==7.4.0
 pytest-cov==4.1.0
 flake8==6.0.0
 black==23.7.0
 
-# Type Hints
-typing-extensions==4.7.1
-
-# Date/Time handling
-python-dateutil==2.8.2
-
-# Optional: For advanced logging
-colorlog==6.7.0
+# External dependencies (to be installed separately)
+# markmap-cli (npm install -g markmap-cli)
