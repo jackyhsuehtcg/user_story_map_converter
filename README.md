@@ -32,7 +32,8 @@ user_story_map_converter/
 │   ├── teams.py        # 團隊管理
 │   └── export.py       # 匯出功能
 ├── tools/               # 開發工具
-│   └── lark_data_extractor.py  # Lark 資料提取工具
+│   ├── lark_data_extractor.py  # Lark 資料提取工具
+│   └── tree_analyzer.py       # 樹狀結構分析工具
 ├── static/              # 靜態檔案
 ├── templates/           # HTML 模板
 ├── logs/               # 日誌檔案
@@ -120,6 +121,34 @@ python tools/lark_data_extractor.py "https://tcgaming.larksuite.com/base/MKdDwAg
 - 欄位結構定義 (table_schema)
 - 完整記錄資料 (table_records)
 - 提取摘要統計 (summary)
+
+#### 樹狀結構分析工具
+
+使用 `tree_analyzer.py` 工具分析 Lark 資料中的父子關係並建立樹狀結構：
+
+```bash
+# 基本分析
+python tools/tree_analyzer.py temp/lark_data_*.json
+
+# 匯出為 JSON 格式
+python tools/tree_analyzer.py temp/lark_data_*.json --export temp/tree_analysis.json
+
+# 匯出為文字格式
+python tools/tree_analyzer.py temp/lark_data_*.json --export temp/tree.txt --format text
+
+# 匯出為 Markdown 格式
+python tools/tree_analyzer.py temp/lark_data_*.json --export temp/tree.md --format markdown
+
+# 靜默模式
+python tools/tree_analyzer.py temp/lark_data_*.json --quiet
+```
+
+工具功能：
+- 解析父子關係 (支援 "Parent Tickets" 等欄位)
+- 建立完整樹狀結構
+- 偵測循環參照和孤兒節點
+- 統計分析 (節點數、深度、層級分布)
+- 多格式匯出 (JSON、文字、Markdown)
 
 **檔案管理原則**：
 - 所有 Lark 原始資料檔案預設儲存到 `temp/` 目錄
