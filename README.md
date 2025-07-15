@@ -43,7 +43,10 @@ user_story_map_converter/
 ### 資料流程
 
 ```
-Lark API → lark_client → tree_builder → Markdown → markmap-cli → HTML/PNG
+Lark API → lark_client → tree_builder → mindmap_generator → markmap-cli → HTML 匯出
+                                                         ↓
+                                                Criteria 浮動顯示
+                                               JIRA 超連結整合
 ```
 
 ## 🛠️ 技術棧
@@ -164,10 +167,9 @@ python tools/tree_analyzer.py temp/lark_data_*.json --quiet
 - 側邊工具欄提供管理功能入口
 
 ### 匯出功能
-- **HTML**: 完整互動式心智圖
-- **PNG/JPG**: 靜態圖片格式
+- **HTML**: 完整互動式心智圖，支援 Criteria 浮動顯示和 JIRA 超連結
+- **PNG/PDF**: 靜態格式（預留功能，未來實作）
 - **Markdown**: 純文字格式
-- **PDF**: 列印友好格式
 
 ### 設計特色
 - 簡潔實用的介面設計
@@ -362,20 +364,24 @@ def get_performance_metrics(self) -> Dict[str, Any]:
 
 ### 心智圖生成器 (mindmap_generator.py)
 
+#### 核心特性
+- **Criteria 浮動顯示**: 滑鼠懸浮在節點上時顯示驗收條件詳細內容
+- **JIRA 超連結整合**: TCG 欄位有值時自動將 Story 編號轉換為 JIRA 超連結
+- **自定義增強**: 注入 CSS/JavaScript 實現進階互動功能
+- **資料驗證**: 自動過濾無效或空白的 Story 編號記錄
+
 #### Markdown 轉換
 ```python
 def generate_mindmap_markdown(self, tree_data: Dict) -> str:
     """將樹狀資料轉換為 Markmap 相容的 Markdown"""
     
-def export_to_formats(self, markdown: str, output_path: str) -> Dict[str, str]:
-    """使用 markmap-cli 匯出多種格式"""
+def _inject_custom_enhancements(self, html_path: str):
+    """注入自定義 CSS 和 JavaScript 來實現進階功能"""
 ```
 
 #### 支援格式
-- **HTML**: 互動式心智圖，支援縮放、摺疊、搜尋
-- **PNG**: 高解析度靜態圖片
-- **SVG**: 向量圖形格式
-- **PDF**: 列印友好格式
+- **HTML**: 互動式心智圖，支援縮放、摺疊、Criteria 浮動顯示、JIRA 超連結
+- **PNG/PDF**: 靜態格式（預留功能，使用 Playwright 實作）
 
 ### 任務管理器 (task_manager.py)
 

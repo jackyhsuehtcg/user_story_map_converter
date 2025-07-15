@@ -82,14 +82,17 @@ user_story_map_converter/
 *   **心智圖生成**: **Markmap (`markmap-cli`)**
     *   後端 Python 邏輯負責將資料轉換為 **Markdown 文字**，然後呼叫 `markmap-cli` 命令列工具，將 Markdown 渲染成互動式心智圖。
 
-*   **匯出引擎**: **Markmap-CLI**
-    *   **HTML**: 直接由 Markmap 生成，產出具備完整互動性的獨立檔案。
-    *   **PNG**: 透過 `markmap-cli` 呼叫無頭瀏覽器 (Puppeteer) 截圖生成。
+*   **匯出引擎**: **Markmap-CLI + 自定義增強**
+    *   **HTML**: 直接由 Markmap 生成，產出具備完整互動性的獨立檔案，並注入自定義 CSS/JavaScript 實現 Criteria 浮動顯示功能。
+    *   **PNG/PDF**: 預留 Playwright 支援（未來實作）。
 
 ### **5. 資料流設計**
 
 ```
-Lark API → lark_client → tree_builder → Markdown 生成 → markmap-cli → HTML/PNG 匯出
+Lark API → lark_client → tree_builder → mindmap_generator → markmap-cli → HTML 匯出
+                                    ↓
+                               Criteria 浮動顯示
+                              JIRA 超連結整合
 ```
 
 ### **6. 資料管理原則**
@@ -112,6 +115,12 @@ Lark API → lark_client → tree_builder → Markdown 生成 → markmap-cli �
 
 *   **心智圖生成**:
     *   Python 的核心任務是將 Lark 資料轉換為 **Markdown 格式的文字**。視覺化工作完全交由外部 `markmap-cli` 工具處理。
+    *   **自定義增強**: 注入 CSS/JavaScript 實現 Criteria 浮動顯示、JIRA 超連結整合等進階功能。
+
+*   **互動式功能**:
+    *   **Criteria 浮動顯示**: 滑鼠懸浮在節點上時顯示驗收條件詳細內容。
+    *   **JIRA 整合**: TCG 欄位有值時自動將 Story 編號轉換為 JIRA 超連結。
+    *   **資料驗證**: 自動過濾無效或空白的 Story 編號記錄。
 
 *   **Web 介面**:
     *   使用 **Bootstrap** 元件快速搭建管理介面，確保風格統一與響應式佈局。
@@ -770,3 +779,186 @@ markmap:
 - 使用 `colorFreezeLevel` 減少顏色計算
 - 設定適當的 `maxWidth` 避免文字溢出
 - 對於大型心智圖，考慮分拆為多個檔案
+
+### **8. MindmapGenerator 核心模組**
+
+#### **模組概述**
+
+`core/mindmap_generator.py` 是心智圖生成的核心模組，負責將 `tree_builder` 產生的樹狀結構轉換為互動式心智圖。
+
+**核心特性**:
+- 基於 Markmap 的互動式心智圖生成
+- Criteria 浮動顯示功能
+- JIRA 超連結整合
+- 自定義 CSS/JavaScript 注入
+- 完整的錯誤處理和統計追蹤
+
+#### **主要類別**
+
+**MindmapGenerator 主類別**:
+```python
+from core.mindmap_generator import MindmapGenerator
+
+# 初始化生成器
+generator = MindmapGenerator(config=config, logger=logger)
+
+# 生成心智圖
+result = generator.generate_mindmap(tree_data, "output/mindmap")
+
+if result.success:
+    print(f"Generated files: {result.output_files}")
+    print(f"Statistics: {result.metadata['stats']}")
+```
+
+**MindmapConfig 配置類別**:
+```python
+@dataclass
+class MindmapConfig:
+    color_freeze_level: int = 2
+    max_width: int = 400
+    spacing_horizontal: int = 150
+    spacing_vertical: int = 15
+    auto_fit: bool = True
+    font_size: int = 14
+    output_formats: List[str] = ["html"]
+    jira_enabled: bool = True
+```
+
+**GenerationResult 結果類別**:
+```python
+@dataclass
+class GenerationResult:
+    success: bool
+    message: str
+    output_files: Dict[str, str]  # 格式 -> 檔案路徑
+    metadata: Dict[str, Any]      # 統計和配置資訊
+```
+
+#### **進階功能實作**
+
+**1. Criteria 浮動顯示**:
+- 自動從 tree_builder 的 `criteria` 字段提取內容
+- 注入 CSS 樣式定義浮動提示框外觀
+- JavaScript 實現滑鼠懸浮事件處理
+- HTML 實體解碼確保中文正確顯示
+
+**2. JIRA 超連結整合**:
+```python
+# 配置 JIRA 整合
+jira_config = {
+    'base_url': 'https://jira.tc-gaming.co/jira',
+    'issue_url_template': '{base_url}/browse/{tcg_number}',
+    'link_target': '_blank',
+    'link_title_template': 'Open {tcg_number} in JIRA'
+}
+```
+
+**3. 資料驗證與統計**:
+```python
+# 生成統計資訊
+stats = generator.get_generation_stats()
+print(f"Nodes processed: {stats['nodes_processed']}")
+print(f"Criteria nodes: {stats['criteria_nodes']}")
+print(f"JIRA links: {stats['jira_links']}")
+print(f"Generation time: {stats['generation_time']:.3f}s")
+```
+
+#### **Markdown 生成格式**
+
+**樹狀結構轉換**:
+```markdown
+---
+title: User Story Map
+markmap:
+  colorFreezeLevel: 2
+  maxWidth: 400
+  spacingHorizontal: 150
+  spacingVertical: 15
+  autoFit: true
+  fontSize: 14
+---
+
+# **ARD**
+
+## <span><small>Story-ARD-00001</small><br/><strong>登入畫面</strong></span>
+
+### <span data-criteria="用戶可以輸入帳號密碼進行登入"><small><a href="https://jira.tc-gaming.co/jira/browse/TCG-109453" target="_blank" title="Open TCG-109453 in JIRA">Story-ARD-00002</a></small><br/><strong>登入畫面 - 輸入帳號密碼</strong></span>
+```
+
+**HTML 增強注入**:
+```javascript
+// 浮動顯示功能
+function showTooltip(event, criteriaText) {
+    var tooltip = createTooltip();
+    tooltip.textContent = criteriaText;
+    tooltip.classList.add('show');
+    // 位置計算和顯示邏輯
+}
+```
+
+#### **使用指引**
+
+**基本使用**:
+```python
+from core.mindmap_generator import MindmapGenerator
+import yaml
+import logging
+
+# 載入配置
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# 設定日誌
+logger = logging.getLogger(__name__)
+
+# 初始化生成器
+generator = MindmapGenerator(config=config, logger=logger)
+
+# 生成心智圖
+result = generator.generate_mindmap(tree_data, "output/user_story_map")
+
+if result.success:
+    print("✅ 心智圖生成成功")
+    for format_type, file_path in result.output_files.items():
+        print(f"  - {format_type.upper()}: {file_path}")
+else:
+    print(f"❌ 生成失敗: {result.message}")
+```
+
+**支援的輸出格式**:
+- `html`: 互動式心智圖（已實作）
+- `png`: 靜態圖片（預留，未實作）
+- `pdf`: PDF 格式（預留，未實作）
+
+#### **整合 tree_builder**
+
+**完整工作流程**:
+```python
+from core.tree_builder import TreeBuilder
+from core.mindmap_generator import MindmapGenerator
+
+# 1. 建構樹狀結構
+builder = TreeBuilder(config=config, logger=logger)
+tree_result = builder.build_tree(lark_records)
+
+# 2. 生成心智圖
+generator = MindmapGenerator(config=config, logger=logger)
+mindmap_result = generator.generate_mindmap(tree_result, "output/mindmap")
+
+# 3. 檢查結果
+if mindmap_result.success:
+    html_file = mindmap_result.output_files['html']
+    print(f"心智圖已生成: {html_file}")
+```
+
+**錯誤處理**:
+```python
+try:
+    result = generator.generate_mindmap(tree_data, output_path)
+    if not result.success:
+        logger.error(f"生成失敗: {result.message}")
+        # 處理失敗情況
+except Exception as e:
+    logger.exception(f"生成過程發生異常: {e}")
+    # 處理異常情況
+```
