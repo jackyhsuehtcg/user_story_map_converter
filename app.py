@@ -276,9 +276,9 @@ class SimpleMindmapGenerator:
                                             .replace(/&#39;/g, "'")
                                             .replace(/&lt;/g, '<')
                                             .replace(/&gt;/g, '>')
-                                            .replace(/&#10;/g, '\n')
-                                            .replace(/&#13;/g, '\r')
-                                            .replace(/&#9;/g, '\t')
+                                            .replace(/&#10;/g, '\\n')
+                                            .replace(/&#13;/g, '\\r')
+                                            .replace(/&#9;/g, '\\t')
                                             .replace(/&amp;/g, '&'); // 最後處理 &
                                         
                                         if (criteria.trim()) {
@@ -308,7 +308,7 @@ class SimpleMindmapGenerator:
                         
                         var tooltip = createTooltip();
                         // 使用 innerHTML 來正確顯示換行符
-                        tooltip.innerHTML = criteriaText.replace(/\n/g, '<br>');
+                        tooltip.innerHTML = criteriaText.replace(/\\n/g, '<br>');
                         tooltip.classList.add('show');
                         
                         // 計算位置
