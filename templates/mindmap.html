@@ -2,63 +2,149 @@
 
 {% block title %}{{ team.name }} - 心智圖查看{% endblock %}
 
+{% block head %}
+<style>
+/* 最大化利用頁面高度 */
+.mindmap-container {
+    height: calc(100vh - 120px); /* 扣除導航欄和標題區域高度 */
+    overflow: hidden;
+}
+
+.mindmap-display {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.sidebar {
+    height: 100%;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    border-left: 1px solid #dee2e6;
+}
+
+.sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: none;
+    overflow: hidden;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .mindmap-container {
+        height: calc(100vh - 100px); /* 手機版調整高度 */
+    }
+    
+    .sidebar {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 280px !important;
+        background: white;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        z-index: 5;
+    }
+    
+    .sidebar.collapsed {
+        right: -280px;
+    }
+    
+    .sidebar-toggle {
+        top: 50%;
+        right: 15px;
+        transform: translateY(-50%);
+    }
+}
+
+@media (max-width: 576px) {
+    .mindmap-container {
+        height: calc(100vh - 80px); /* 更小螢幕進一步調整 */
+    }
+    
+    .sidebar {
+        width: 100% !important;
+    }
+    
+    .sidebar.collapsed {
+        right: -100%;
+    }
+}
+
+.mindmap-iframe {
+    border: none;
+    width: 100%;
+    height: 100%;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- 頁面標題 -->
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 mb-0">{{ team.name or 'Team Alpha' }} - User Story Map</h1>
-        <p class="text-muted mb-0">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="flex-grow-1 me-3">
+        <h1 class="h4 mb-0 text-truncate">{{ team.name or 'Team Alpha' }} - User Story Map</h1>
+        <p class="text-muted mb-0 small d-none d-md-block">
             <i class="fas fa-clock me-1"></i>
             最後更新: {{ team.last_updated or '2025-07-15 14:30:25' }}
         </p>
     </div>
     <div class="btn-group" role="group">
-        <button class="btn btn-outline-secondary" onclick="refreshMindmap()">
-            <i class="fas fa-sync-alt me-1"></i>刷新
+        <button class="btn btn-outline-secondary btn-sm" onclick="refreshMindmap()" title="刷新">
+            <i class="fas fa-sync-alt"></i>
+            <span class="d-none d-md-inline ms-1">刷新</span>
         </button>
-        <button class="btn btn-outline-secondary" onclick="toggleFullscreen()">
-            <i class="fas fa-expand me-1"></i>全螢幕
+        <button class="btn btn-outline-secondary btn-sm" onclick="toggleFullscreen()" title="全螢幕">
+            <i class="fas fa-expand"></i>
+            <span class="d-none d-lg-inline ms-1">全螢幕</span>
         </button>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exportModal">
-            <i class="fas fa-download me-1"></i>匯出
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#exportModal" title="匯出">
+            <i class="fas fa-download"></i>
+            <span class="d-none d-md-inline ms-1">匯出</span>
         </button>
     </div>
 </div>
 
 <!-- 心智圖展示區 -->
-<div class="row">
-    <div class="col-lg-9">
-        <div class="card h-100">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-sitemap me-2"></i>互動式心智圖
-                    </h5>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button class="btn btn-outline-secondary" onclick="zoomIn()" title="放大">
-                            <i class="fas fa-search-plus"></i>
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="zoomOut()" title="縮小">
-                            <i class="fas fa-search-minus"></i>
-                        </button>
-                        <button class="btn btn-outline-secondary" onclick="resetZoom()" title="重設縮放">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <!-- 心智圖 iframe -->
-                <iframe src="{{ mindmap_url or '/static/sample-mindmap.html' }}" 
-                        class="w-100 border-0" 
-                        style="height: 600px;"
-                        id="mindmapFrame">
-                </iframe>
-            </div>
+<div class="mindmap-container d-flex">
+    <!-- 主要心智圖顯示區域 -->
+    <div class="mindmap-display flex-grow-1 position-relative">
+        <!-- 右側工具欄切換按鈕 -->
+        <div class="sidebar-toggle" onclick="toggleSidebar()" title="切換工具欄">
+            <i class="fas fa-bars" id="sidebarToggleIcon"></i>
         </div>
+        
+        <!-- 心智圖 iframe -->
+        <iframe src="{{ mindmap_url or '/static/sample-mindmap.html' }}" 
+                class="mindmap-iframe"
+                id="mindmapFrame">
+        </iframe>
     </div>
     
-    <div class="col-lg-3">
+    <!-- 右側工具欄 -->
+    <div class="sidebar col-lg-3 col-md-4" id="sidebar">
         <!-- 統計面板 -->
         <div class="card mb-4">
             <div class="card-header">
@@ -216,6 +302,46 @@
 {% block scripts %}
 <script>
 let isFullscreen = false;
+let sidebarCollapsed = false;
+
+// 切換右側工具欄
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const icon = document.getElementById('sidebarToggleIcon');
+    
+    sidebarCollapsed = !sidebarCollapsed;
+    
+    if (sidebarCollapsed) {
+        sidebar.classList.add('collapsed');
+        icon.className = 'fas fa-chevron-left';
+    } else {
+        sidebar.classList.remove('collapsed');
+        icon.className = 'fas fa-bars';
+    }
+}
+
+// 響應式處理
+function handleResize() {
+    const sidebar = document.getElementById('sidebar');
+    const icon = document.getElementById('sidebarToggleIcon');
+    
+    // 在小螢幕上自動隱藏側邊欄
+    if (window.innerWidth <= 768) {
+        if (!sidebarCollapsed) {
+            sidebar.classList.add('collapsed');
+            icon.className = 'fas fa-chevron-left';
+            sidebarCollapsed = true;
+        }
+    }
+}
+
+// 監聽窗口大小變化
+window.addEventListener('resize', handleResize);
+
+// 頁面載入時初始化
+document.addEventListener('DOMContentLoaded', function() {
+    handleResize(); // 初始檢查螢幕大小
+});
 
 // 全螢幕切換
 function toggleFullscreen() {
