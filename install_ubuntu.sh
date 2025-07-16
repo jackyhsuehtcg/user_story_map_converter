@@ -123,7 +123,18 @@ main() {
     
     # Install markmap-cli globally
     log_info "Installing markmap-cli globally..."
-    npm install -g markmap-cli
+    
+    # Try without sudo first, then with sudo if it fails
+    if npm install -g markmap-cli 2>/dev/null; then
+        log_success "markmap-cli installed without sudo"
+    else
+        log_warning "Permission denied, trying with sudo..."
+        if ! sudo npm install -g markmap-cli; then
+            log_error "Failed to install markmap-cli even with sudo"
+            log_info "Alternative: Install markmap-cli locally with: npm install markmap-cli"
+            exit 1
+        fi
+    fi
     
     # Verify markmap-cli installation
     if command_exists markmap; then

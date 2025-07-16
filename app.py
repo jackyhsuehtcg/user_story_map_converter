@@ -86,11 +86,14 @@ class SimpleMindmapGenerator:
         """轉義 HTML 屬性中的特殊字符"""
         if not text:
             return ""
-        return (text.replace('"', '&quot;')
+        return (text.replace('&', '&amp;')  # 必須先處理 &
+                   .replace('"', '&quot;')
                    .replace("'", '&#39;')
                    .replace('<', '&lt;')
                    .replace('>', '&gt;')
-                   .replace('&', '&amp;'))
+                   .replace('\n', '&#10;')  # 換行符
+                   .replace('\r', '&#13;')  # 回車符
+                   .replace('\t', '&#9;'))   # 制表符
     
     def _extract_middle_part(self, story_no: str) -> str:
         """從 Story-XXX-YYYYY 格式中提取中間的 XXX 部分"""
@@ -211,18 +214,21 @@ class SimpleMindmapGenerator:
                 position: absolute;
                 background: rgba(0, 0, 0, 0.9);
                 color: white;
-                padding: 8px 12px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-family: Arial, sans-serif;
-                max-width: 300px;
+                padding: 10px 14px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                max-width: 320px;
+                min-width: 120px;
                 word-wrap: break-word;
+                white-space: normal;
+                line-height: 1.4;
                 z-index: 1000;
                 pointer-events: none;
                 opacity: 0;
                 transition: opacity 0.2s ease-in-out;
-                border: 1px solid #666;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                border: 1px solid #555;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             }
             
             .criteria-tooltip.show {
@@ -264,10 +270,16 @@ class SimpleMindmapGenerator:
                                     var match = content.match(/data-criteria="([^"]*?)"/);
                                     if (match) {
                                         var criteria = match[1];
-                                        // 解碼 HTML 實體
-                                        var tempDiv = document.createElement('div');
-                                        tempDiv.innerHTML = criteria;
-                                        criteria = tempDiv.textContent || tempDiv.innerText || '';
+                                        // 解碼 HTML 實體並處理換行符
+                                        criteria = criteria
+                                            .replace(/&quot;/g, '"')
+                                            .replace(/&#39;/g, "'")
+                                            .replace(/&lt;/g, '<')
+                                            .replace(/&gt;/g, '>')
+                                            .replace(/&#10;/g, '\n')
+                                            .replace(/&#13;/g, '\r')
+                                            .replace(/&#9;/g, '\t')
+                                            .replace(/&amp;/g, '&'); // 最後處理 &
                                         
                                         if (criteria.trim()) {
                                             criteriaMap[lineInfo] = criteria;
@@ -295,7 +307,8 @@ class SimpleMindmapGenerator:
                         if (!criteriaText || criteriaText.trim() === '') return;
                         
                         var tooltip = createTooltip();
-                        tooltip.textContent = criteriaText;
+                        // 使用 innerHTML 來正確顯示換行符
+                        tooltip.innerHTML = criteriaText.replace(/\n/g, '<br>');
                         tooltip.classList.add('show');
                         
                         // 計算位置

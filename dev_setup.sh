@@ -24,7 +24,18 @@ pip3 install --upgrade \
 
 # Install markmap-cli
 echo "🗺️ Installing markmap-cli..."
-npm install -g markmap-cli
+
+# Try without sudo first, then with sudo if it fails
+if npm install -g markmap-cli 2>/dev/null; then
+    echo "✅ markmap-cli installed without sudo"
+else
+    echo "⚠️ Permission denied, trying with sudo..."
+    if ! sudo npm install -g markmap-cli; then
+        echo "❌ Failed to install markmap-cli"
+        echo "Alternative: Install markmap-cli locally with: npm install markmap-cli"
+        exit 1
+    fi
+fi
 
 # Create development directories
 echo "📁 Creating development directories..."
