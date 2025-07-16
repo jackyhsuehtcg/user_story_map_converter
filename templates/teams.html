@@ -493,16 +493,89 @@ function syncNow(teamId) {
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            showAlert('同步失敗', data.error, 'error');
+            showSyncAlert('同步失敗', data.error, 'error');
         } else {
-            showAlert('開始同步', '開始同步，請稍後刷新頁面查看狀態', 'success');
-            // 刷新頁面以顯示最新狀態
-            setTimeout(() => location.reload(), 1000);
+            showSyncAlert('同步開始', '心智圖生成已開始，完成後請刷新頁面查看結果', 'success');
         }
     })
     .catch(error => {
         console.error('同步失敗:', error);
-        showAlert('同步失敗', '同步失敗，請稍後再試', 'error');
+        showSyncAlert('同步失敗', '網路連接失敗，請稍後再試', 'error');
+    });
+}
+
+// 顯示同步相關的提示訊息（不自動關閉）
+function showSyncAlert(title, message, type = 'info') {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas ${type === 'success' ? 'fa-check-circle text-success' : 
+                            type === 'error' ? 'fa-exclamation-circle text-danger' : 
+                            'fa-info-circle text-info'} me-2"></i>${title}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">${message}</p>
+                    ${type === 'success' ? 
+                        '<div class="alert alert-info mt-3 mb-0"><i class="fas fa-lightbulb me-2"></i>您可以使用瀏覽器的重新整理功能或點擊導航列的「團隊管理」來查看最新狀態</div>' : ''}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">確定</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // 清理
+    modal.addEventListener('hidden.bs.modal', function () {
+        document.body.removeChild(modal);
+    });
+}
+
+// 顯示更新成功提示（不自動刷新）
+function showUpdateSuccessAlert(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle text-success me-2"></i>${title}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">${message}</p>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        頁面將自動重新整理以顯示最新狀態
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">稍後手動刷新</button>
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">立即刷新頁面</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    // 清理
+    modal.addEventListener('hidden.bs.modal', function () {
+        document.body.removeChild(modal);
     });
 }
 
@@ -664,12 +737,12 @@ function updateTeam() {
         if (data.error) {
             showAlert('更新失敗', data.error, 'error');
         } else {
-            showAlert('更新成功', '團隊更新成功', 'success');
             // 關閉模態框
             const modal = bootstrap.Modal.getInstance(document.getElementById('editTeamModal'));
             modal.hide();
-            // 刷新頁面
-            setTimeout(() => location.reload(), 1000);
+            
+            // 顯示更新成功提示（不自動刷新）
+            showUpdateSuccessAlert('團隊更新成功', '設定已儲存，如果修改了 Lark URL，舊的心智圖已清除，請重新同步');
         }
     })
     .catch(error => {

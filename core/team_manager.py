@@ -190,12 +190,27 @@ class TeamManager:
         if team_id not in self.teams:
             return {'error': '團隊不存在'}
         
+        # 檢查 URL 是否更改
+        old_lark_url = self.teams[team_id].get('lark_url')
+        new_lark_url = team_data.get('lark_url', old_lark_url)
+        url_changed = old_lark_url != new_lark_url
+        
         self.teams[team_id].update({
             'name': team_data.get('name', self.teams[team_id].get('name')),
-            'lark_url': team_data.get('lark_url', self.teams[team_id].get('lark_url')),
+            'lark_url': new_lark_url,
             'description': team_data.get('description', self.teams[team_id].get('description')),
             'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
+        
+        # 如果 URL 更改，重置相關狀態
+        if url_changed:
+            self.logger.info(f"團隊 {team_id} 的 Lark URL 已更改，重置狀態")
+            # 重置記錄數和清除心智圖檔案
+            self.teams[team_id]['record_count'] = 0
+            self._cleanup_team_files(team_id)
+            # 移除任何現有的狀態標記
+            if 'status' in self.teams[team_id]:
+                del self.teams[team_id]['status']
         
         # 確保記錄數欄位存在
         if 'record_count' not in self.teams[team_id]:
