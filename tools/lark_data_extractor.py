@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import sys
+import yaml
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs
@@ -34,17 +35,24 @@ class LarkDataExtractor:
     """Lark data extraction tool"""
     
     def __init__(self):
-        # Hard-coded credentials as requested
-        self.app_id = "cli_a8d1077685be102f"
-        self.app_secret = "kS35CmIAjP5tVib1LpPIqUkUJjuj3pIt"
+        # Load configuration from config.yaml
+        self.config = self._load_config()
+        
+        # Get Lark credentials from config
+        lark_config = self.config.get('lark', {})
+        self.app_id = lark_config.get('app_id')
+        self.app_secret = lark_config.get('app_secret')
+        
+        if not self.app_id or not self.app_secret:
+            raise ValueError("Lark app_id and app_secret must be configured in config.yaml")
         
         # Setup logger
         self.logger = self._setup_logger()
         
-        # Configuration for Lark client
-        self.config = {
-            'base_url': 'https://open.larksuite.com/open-apis',
-            'timeout': 30,
+        # Configuration for Lark client (merge with config.yaml settings)
+        client_config = {
+            'base_url': lark_config.get('base_url', 'https://open.larksuite.com/open-apis'),
+            'timeout': lark_config.get('timeout', 30),
             'max_retries': 3,
             'retry_base_delay': 1.0,
             'retry_max_delay': 60.0,
@@ -54,14 +62,26 @@ class LarkDataExtractor:
             'requests_per_minute': 100,
             'max_page_size': 500
         }
+        self.client_config = client_config
         
         # Initialize Lark client
         self.client = LarkClient(
             app_id=self.app_id,
             app_secret=self.app_secret,
-            config=self.config,
+            config=self.client_config,
             logger=self.logger
         )
+    
+    def _load_config(self) -> dict:
+        """Load configuration from config.yaml"""
+        try:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.yaml')
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError("config.yaml not found. Please make sure it exists in the project root.")
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in config.yaml: {e}")
     
     def _setup_logger(self) -> logging.Logger:
         """Setup logger for the tool"""
