@@ -55,7 +55,9 @@ class TreeNode:
     """Represents a node in the tree structure"""
     record_id: str
     story_no: str
-    features: str
+    description: str  # 改為 description，由 "As a" 和 "I want" 組合
+    as_a: Optional[str] = None
+    i_want: Optional[str] = None
     criteria: Optional[str] = None
     parent_id: Optional[str] = None
     children: List['TreeNode'] = field(default_factory=list)
@@ -96,7 +98,9 @@ class TreeNode:
         return {
             'record_id': self.record_id,
             'story_no': self.story_no,
-            'features': self.features,
+            'description': self.description,
+            'as_a': self.as_a,
+            'i_want': self.i_want,
             'criteria': self.criteria,
             'parent_id': self.parent_id,
             'level': self.level,
@@ -107,7 +111,7 @@ class TreeNode:
         }
     
     def __str__(self):
-        return f"{self.story_no}: {self.features}"
+        return f"{self.story_no}: {self.description}"
     
     def __eq__(self, other):
         return isinstance(other, TreeNode) and self.record_id == other.record_id
@@ -268,14 +272,21 @@ class TreeAnalyzer:
         
         # Extract basic information
         story_no = fields.get('Story.No', f'Unknown-{record_id[:8]}')
-        features = fields.get('Features', 'No description')
+        as_a = fields.get('As a', '').strip()
+        i_want = fields.get('I want', '').strip()
+        features = fields.get('Features', '').strip()
         criteria = fields.get('Criteria', '')
+        
+        # 組合 description 從 "As a" 和 "I want" 欄位，若無則回退到 Features
+        description = self._build_description(as_a, i_want, features)
         
         # Create node with metadata
         node = TreeNode(
             record_id=record_id,
             story_no=story_no,
-            features=features,
+            description=description,
+            as_a=as_a if as_a else None,
+            i_want=i_want if i_want else None,
             criteria=criteria if criteria else None,
             metadata={
                 'original_record': record,
@@ -317,6 +328,36 @@ class TreeAnalyzer:
                 return parent_data
         
         return None
+    
+    def _build_description(self, as_a: str, i_want: str, features: str = '') -> str:
+        """
+        從 "As a" 和 "I want" 欄位組合生成描述，若無則回退到 Features
+        
+        Args:
+            as_a: "As a" 欄位內容
+            i_want: "I want" 欄位內容
+            features: "Features" 欄位內容（回退選項）
+            
+        Returns:
+            組合後的描述文字
+        """
+        # 如果兩個欄位都有內容，組合成完整描述
+        if as_a and i_want:
+            return f"As a {as_a}, I want {i_want}"
+        
+        # 如果只有其中一個欄位有內容
+        if as_a and not i_want:
+            return f"As a {as_a}"
+        
+        if i_want and not as_a:
+            return f"I want {i_want}"
+        
+        # 如果 As a 和 I want 都沒有內容，回退到 Features
+        if features:
+            return features
+        
+        # 如果都沒有內容，返回預設描述
+        return "No description"
     
     def _build_tree_relationships(self):
         """Build parent-child relationships in the tree"""
@@ -440,7 +481,7 @@ class TreeAnalyzer:
         for root in self._root_nodes:
             root_details.append({
                 'story_no': root.story_no,
-                'features': root.features,
+                'description': root.description,
                 'descendants': root.get_descendants_count()
             })
         
@@ -524,9 +565,9 @@ class TreeAnalyzer:
         if not prefix:
             connector = ""
         
-        features = node_data['features']
+        description = node_data['description']
         level_info = f" (Level {node_data['level']})" if node_data['level'] > 0 else ""
-        lines.append(f"{prefix}{connector}{node_data['story_no']}: {features}{level_info}")
+        lines.append(f"{prefix}{connector}{node_data['story_no']}: {description}{level_info}")
         
         children = node_data.get('children', [])
         for i, child in enumerate(children):
@@ -598,7 +639,7 @@ class TreeAnalyzer:
         print(f"\n🎯 根節點列表:")
         for i, root_detail in enumerate(stats['root_details'], 1):
             desc_count = root_detail['descendants']
-            print(f"  {i}. {root_detail['story_no']}: {root_detail['features']}")
+            print(f"  {i}. {root_detail['story_no']}: {root_detail['description']}")
             print(f"     └── {desc_count} 個子節點")
 
 

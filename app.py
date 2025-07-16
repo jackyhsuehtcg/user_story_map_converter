@@ -119,14 +119,14 @@ class SimpleMindmapGenerator:
         """遞歸添加樹節點到 Markdown"""
         prefix = '#' * level
         story_no = node.get('story_no', 'Unknown')
-        features = node.get('features', 'No description')
+        description = node.get('description', 'No description')
         criteria = node.get('criteria', '')
         tcg = node.get('tcg')
         
         story_display = self._generate_jira_link(story_no, tcg)
         
         criteria_attr = f' data-criteria="{self._escape_html_attr(criteria)}"' if criteria else ''
-        title = f'{prefix} <span{criteria_attr}>{story_display}<br/><strong>{features}</strong></span>'
+        title = f'{prefix} <span{criteria_attr}>{story_display}<br/><strong>{description}</strong></span>'
         lines.append(title)
         lines.append("")
         

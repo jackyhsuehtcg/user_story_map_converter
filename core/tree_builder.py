@@ -29,7 +29,9 @@ class TreeNode:
     """Simple tree node representation"""
     record_id: str
     story_no: str
-    features: str
+    description: str  # 改為 description，由 "As a" 和 "I want" 組合
+    as_a: Optional[str] = None
+    i_want: Optional[str] = None
     criteria: Optional[str] = None
     tcg: Optional[str] = None
     parent_id: Optional[str] = None
@@ -49,7 +51,9 @@ class TreeNode:
         result = {
             'record_id': self.record_id,
             'story_no': self.story_no,
-            'features': self.features,
+            'description': self.description,
+            'as_a': self.as_a,
+            'i_want': self.i_want,
             'criteria': self.criteria,
             'tcg': self.tcg,
             'parent_id': self.parent_id,
@@ -71,11 +75,20 @@ class TreeBuilder:
         
         # Configurable field mappings
         self.parent_field_names = self.config.get('parent_field_names', ['Parent Tickets', '父記錄', 'parent'])
-        self.field_mappings = self.config.get('field_mappings', {
+        
+        # Default field mappings
+        default_mappings = {
             'story_no': 'Story.No',
-            'features': 'Features', 
-            'criteria': 'Criteria'
-        })
+            'as_a': 'As a',
+            'i_want': 'I want',
+            'features': 'Features',
+            'criteria': 'Criteria',
+            'tcg': 'TCG'
+        }
+        
+        # Merge with config, ensuring defaults are preserved
+        config_mappings = self.config.get('field_mappings', {})
+        self.field_mappings = {**default_mappings, **config_mappings}
         self.preserve_extra_fields = self.config.get('preserve_extra_fields', True)
         
         # Story number validation pattern: Story-XXX-YYYYY
@@ -169,9 +182,14 @@ class TreeBuilder:
         self.logger.debug(f"Record {record_id}: Valid story number '{story_no}'")
         
         # Get other fields
-        features = fields.get(self.field_mappings['features'], 'No description')
+        as_a = fields.get(self.field_mappings['as_a'], '').strip()
+        i_want = fields.get(self.field_mappings['i_want'], '').strip()
+        features = fields.get(self.field_mappings['features'], '').strip()
         criteria = fields.get(self.field_mappings['criteria'], '')
         tcg = self._extract_tcg_value(fields)
+        
+        # 組合 description 從 "As a" 和 "I want" 欄位，若無則回退到 Features
+        description = self._build_description(as_a, i_want, features)
         
         parent_id = self._extract_parent_id(fields)
         
@@ -186,7 +204,9 @@ class TreeBuilder:
         return TreeNode(
             record_id=record_id,
             story_no=story_no,
-            features=features,
+            description=description,
+            as_a=as_a if as_a else None,
+            i_want=i_want if i_want else None,
             criteria=criteria if criteria else None,
             tcg=tcg,
             parent_id=parent_id,
@@ -210,6 +230,36 @@ class TreeBuilder:
                 return parent_data
         
         return None
+    
+    def _build_description(self, as_a: str, i_want: str, features: str = '') -> str:
+        """
+        從 "As a" 和 "I want" 欄位組合生成描述，若無則回退到 Features
+        
+        Args:
+            as_a: "As a" 欄位內容
+            i_want: "I want" 欄位內容
+            features: "Features" 欄位內容（回退選項）
+            
+        Returns:
+            組合後的描述文字
+        """
+        # 如果兩個欄位都有內容，組合成完整描述
+        if as_a and i_want:
+            return f"As a {as_a}, I want {i_want}"
+        
+        # 如果只有其中一個欄位有內容
+        if as_a and not i_want:
+            return f"As a {as_a}"
+        
+        if i_want and not as_a:
+            return f"I want {i_want}"
+        
+        # 如果 As a 和 I want 都沒有內容，回退到 Features
+        if features:
+            return features
+        
+        # 如果都沒有內容，返回預設描述
+        return "No description"
     
     def _extract_tcg_value(self, fields: Dict[str, Any]) -> Optional[str]:
         """Extract TCG value from fields"""
