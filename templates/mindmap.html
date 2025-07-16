@@ -492,14 +492,122 @@ function startExport() {
 
 // 複製分享連結
 function copyShareLink() {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-        console.log('分享連結已複製');
-        // 顯示成功提示
-        showAlert('複製成功', '分享連結已複製到剪貼簿', 'success');
-    }).catch(err => {
-        console.error('複製失敗:', err);
-        showAlert('複製失敗', '無法複製分享連結，請手動複製網址', 'error');
-    });
+    const url = window.location.href;
+    
+    // 檢查是否支援現代 Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+        // 使用現代 Clipboard API (需要 HTTPS)
+        navigator.clipboard.writeText(url).then(() => {
+            console.log('分享連結已複製 (Clipboard API)');
+            showAlert('複製成功', '分享連結已複製到剪貼簿', 'success');
+        }).catch(err => {
+            console.error('Clipboard API 複製失敗:', err);
+            fallbackCopyTextToClipboard(url);
+        });
+    } else {
+        // 使用回退方法
+        fallbackCopyTextToClipboard(url);
+    }
+}
+
+// 回退複製方法（適用於舊瀏覽器或 HTTP 環境）
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    
+    // 避免畫面跳動
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            console.log('分享連結已複製 (fallback method)');
+            showAlert('複製成功', '分享連結已複製到剪貼簿', 'success');
+        } else {
+            throw new Error('execCommand copy 失敗');
+        }
+    } catch (err) {
+        console.error('回退複製方法失敗:', err);
+        
+        // 提供手動複製選項
+        const modal = createCopyModal(text);
+        document.body.appendChild(modal);
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+        
+        // 清理
+        modal.addEventListener('hidden.bs.modal', function () {
+            document.body.removeChild(modal);
+        });
+    } finally {
+        document.body.removeChild(textArea);
+    }
+}
+
+// 創建手動複製對話框
+function createCopyModal(url) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-link me-2"></i>分享連結
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">無法自動複製連結，請手動複製以下網址：</p>
+                    <div class="input-group">
+                        <input type="text" class="form-control" value="${url}" readonly id="shareUrlInput">
+                        <button class="btn btn-outline-secondary" type="button" onclick="selectShareUrl()">
+                            <i class="fas fa-copy me-1"></i>全選
+                        </button>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-info-circle me-1"></i>
+                        使用 Ctrl+C (Windows) 或 Cmd+C (Mac) 複製
+                    </small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">關閉</button>
+                </div>
+            </div>
+        </div>
+    `;
+    return modal;
+}
+
+// 全選分享網址
+function selectShareUrl() {
+    const input = document.getElementById('shareUrlInput');
+    input.select();
+    input.setSelectionRange(0, 99999); // 對行動裝置
+    
+    // 再次嘗試複製
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showAlert('複製成功', '分享連結已複製到剪貼簿', 'success');
+        }
+    } catch (err) {
+        console.log('手動複製模式 - 請使用鍵盤快捷鍵');
+    }
 }
 
 // 顯示提示訊息
